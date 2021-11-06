@@ -1,0 +1,1 @@
+Changed `class.entrycontroller.php` to support multiple emails from oauth. 

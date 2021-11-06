@@ -607,12 +607,21 @@ class EntryController extends Gdn_Controller {
             // First, discover if we have search criteria.
             $search = false;
             $existingUsers = [];
-            if ($searchName && $nameUnique) {
+
+            // THOR: CODE ADDED HERE
+            $emails = $this->Form->getFormValue('Email');
+            $emails = is_array($emails)? $emails : [$emails];
+            $emails = array_filter($emails);
+            
+	    if ($searchName && $nameUnique) {
                 $userModel->SQL->orWhere('Name', $searchName);
                 $search = true;
             }
             if ($this->Form->getFormValue('Email') && ($emailUnique || $autoConnect)) {
-                $userModel->SQL->orWhere('Email', $this->Form->getFormValue('Email'));
+                // THOR: FOREACH ADDED HERE
+                foreach($emails as $email) {
+                    $userModel->SQL->orWhere('Email', $email);
+                }
                 $search = true;
             }
             if (is_numeric($userSelect)) {
@@ -624,9 +633,13 @@ class EntryController extends Gdn_Controller {
                 $existingUsers = $userModel->getWhere()->resultArray();
             }
 
+            // THOR: COMMENTED AND REPLACED 2 LINES
             // Get the email and decide if we can safely find a match.
-            $submittedEmail = $this->Form->getFormValue('Email');
-            $canMatchEmail = (strlen($submittedEmail) > 0) && !UserModel::noEmail();
+            // $submittedEmail = $this->Form->getFormValue('Email');
+            // $canMatchEmail = (strlen($submittedEmail) > 0) && !UserModel::noEmail();
+
+            $submittedEmail = $emails[0] ?? null;
+            $canMatchEmail = (count($emails) > 0) && ! UserModel::noEmail();
 
             // Check to automatically link the user.
             if ($autoConnect && count($existingUsers) > 0) {
@@ -637,52 +650,55 @@ class EntryController extends Gdn_Controller {
                 if ($canMatchEmail) {
                     // Check each existing user for an exact email match.
                     foreach ($existingUsers as $row) {
-                        if (strcasecmp($submittedEmail, $row['Email']) === 0) {
-                            // Add the UserID to the form, then get the unified user data set from it.
-                            $userID = $row['UserID'];
-                            $this->Form->setFormValue('UserID', $userID);
-                            $data = $this->Form->formValues();
-
-                            // User synchronization.
-                            if (c('Garden.Registration.ConnectSynchronize', true)) {
-                                // Don't overwrite a photo if the user has already uploaded one.
-                                $photo = val('Photo', $row);
-                                if (!val('Photo', $data) || ($photo && !stringBeginsWith($photo, 'http'))) {
-                                    unset($data['Photo']);
+                        // THOR: FOREACH ADDED HERE
+                        foreach($emails as $email) {
+                            if (strcasecmp($email, $row['Email']) === 0) {
+                                // Add the UserID to the form, then get the unified user data set from it.
+                                $userID = $row['UserID'];
+                                $this->Form->setFormValue('UserID', $userID);
+                                $data = $this->Form->formValues();
+    
+                                // User synchronization.
+                                if (c('Garden.Registration.ConnectSynchronize', true)) {
+                                    // Don't overwrite a photo if the user has already uploaded one.
+                                    $photo = val('Photo', $row);
+                                    if (!val('Photo', $data) || ($photo && !stringBeginsWith($photo, 'http'))) {
+                                        unset($data['Photo']);
+                                    }
+    
+                                    // Update the user.
+                                    $userModel->save($data, [
+                                        UserModel::OPT_NO_CONFIRM_EMAIL => true,
+                                        UserModel::OPT_FIX_UNIQUE => true,
+                                        UserModel::OPT_SAVE_ROLES => $saveRoles,
+                                        UserModel::OPT_VALIDATE_NAME => !$isTrustedProvider,
+                                        UserModel::OPT_ROLE_SYNC => $userModel->getConnectRoleSync(),
+                                    ]);
+                                    $this->EventArguments['UserID'] = $userID;
+                                    $this->fireEvent('AfterConnectSave');
                                 }
-
-                                // Update the user.
-                                $userModel->save($data, [
-                                    UserModel::OPT_NO_CONFIRM_EMAIL => true,
-                                    UserModel::OPT_FIX_UNIQUE => true,
-                                    UserModel::OPT_SAVE_ROLES => $saveRoles,
-                                    UserModel::OPT_VALIDATE_NAME => !$isTrustedProvider,
-                                    UserModel::OPT_ROLE_SYNC => $userModel->getConnectRoleSync(),
+    
+                                // Always save the attributes because they may contain authorization information.
+                                if ($attributes = $this->Form->getFormValue('Attributes')) {
+                                    $userModel->saveAttribute($userID, $attributes);
+                                }
+    
+                                // Save the user authentication association.
+                                $userModel->saveAuthentication([
+                                    'UserID' => $userID,
+                                    'Provider' => $this->Form->getFormValue('Provider'),
+                                    'UniqueID' => $this->Form->getFormValue('UniqueID'),
                                 ]);
-                                $this->EventArguments['UserID'] = $userID;
-                                $this->fireEvent('AfterConnectSave');
+    
+                                // Sign the user in.
+                                Gdn::userModel()->fireEvent('BeforeSignIn', ['UserID' => $userID]);
+                                Gdn::session()->start($userID, true, (bool)$this->Form->getFormValue('RememberMe', c('Garden.SSO.RememberMe', true)));
+                                Gdn::userModel()->fireEvent('AfterSignIn');
+                                $this->_setRedirect(Gdn::request()->get('display') === 'popup');
+                                $this->render();
+    
+                                return;
                             }
-
-                            // Always save the attributes because they may contain authorization information.
-                            if ($attributes = $this->Form->getFormValue('Attributes')) {
-                                $userModel->saveAttribute($userID, $attributes);
-                            }
-
-                            // Save the user authentication association.
-                            $userModel->saveAuthentication([
-                                'UserID' => $userID,
-                                'Provider' => $this->Form->getFormValue('Provider'),
-                                'UniqueID' => $this->Form->getFormValue('UniqueID'),
-                            ]);
-
-                            // Sign the user in.
-                            Gdn::userModel()->fireEvent('BeforeSignIn', ['UserID' => $userID]);
-                            Gdn::session()->start($userID, true, (bool)$this->Form->getFormValue('RememberMe', c('Garden.SSO.RememberMe', true)));
-                            Gdn::userModel()->fireEvent('AfterSignIn');
-                            $this->_setRedirect(Gdn::request()->get('display') === 'popup');
-                            $this->render();
-
-                            return;
                         }
                     }
                 }
@@ -764,7 +780,7 @@ class EntryController extends Gdn_Controller {
                 $user['Source'] = $this->Form->getFormValue('Provider');
                 $user['SourceID'] = $this->Form->getFormValue('UniqueID');
                 $user['Attributes'] = $this->Form->getFormValue('Attributes', null);
-                $user['Email'] = $this->Form->getFormValue('ConnectEmail', $this->Form->getFormValue('Email', null));
+                $user['Email'] = $this->Form->getFormValue('ConnectEmail', $submittedEmail); // THOR: changed here
                 $user['Name'] = $this->Form->getFormValue('ConnectName', $this->Form->getFormValue('Name', null));
                 $userID = $userModel->register($user, $registerOptions);
 
@@ -898,6 +914,14 @@ class EntryController extends Gdn_Controller {
             } elseif ($this->Form->errorCount() == 0) {
                 // The user doesn't exist so we need to add another user.
                 $user = $this->Form->formValues();
+
+                // THOR: take first email if array
+                $emails = $user['Email'];
+                if (is_array($user['Email'])) {
+                    $user['Email'] = $user['Email'][0];
+                }
+
+
                 $user['Name'] = $user['ConnectName'] ?? $user['Name'];
                 $user['Password'] = randomString(16); // Required field.
                 $user['HashMethod'] = 'Random';
