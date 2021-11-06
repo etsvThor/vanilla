@@ -1297,11 +1297,11 @@ class EntryController extends Gdn_Controller {
             // Add validation rules that are not enforced by the model
             $this->UserModel->defineSchema();
             $this->UserModel->Validation->applyRule('Name', 'Username', $this->UsernameError);
-            $this->UserModel->Validation->applyRule('TermsOfService', 'Required', t('You must agree to the terms of service.'));
+            #$this->UserModel->Validation->applyRule('TermsOfService', 'Required', t('You must agree to the terms of service.'));
             $this->UserModel->Validation->applyRule('Password', 'Required');
             $this->UserModel->Validation->applyRule('Password', 'Strength');
             $this->UserModel->Validation->applyRule('Password', 'Match');
-            $this->UserModel->Validation->applyRule('DiscoveryText', 'Required', 'Tell us why you want to join!');
+            #$this->UserModel->Validation->applyRule('DiscoveryText', 'Required', 'Tell us why you want to join!');
             // $this->UserModel->Validation->applyRule('DateOfBirth', 'MinimumAge');
 
             $this->fireEvent('RegisterValidation');
@@ -1359,7 +1359,7 @@ class EntryController extends Gdn_Controller {
             // Add validation rules that are not enforced by the model
             $this->UserModel->defineSchema();
             $this->UserModel->Validation->applyRule('Name', 'Username', $this->UsernameError);
-            $this->UserModel->Validation->applyRule('TermsOfService', 'Required', t('You must agree to the terms of service.'));
+            #$this->UserModel->Validation->applyRule('TermsOfService', 'Required', t('You must agree to the terms of service.'));
             $this->UserModel->Validation->applyRule('Password', 'Required');
             $this->UserModel->Validation->applyRule('Password', 'Strength');
             $this->UserModel->Validation->applyRule('Password', 'Match');
@@ -1501,7 +1501,7 @@ class EntryController extends Gdn_Controller {
             // Add validation rules that are not enforced by the model
             $this->UserModel->defineSchema();
             $this->UserModel->Validation->applyRule('Name', 'Username', $this->UsernameError);
-            $this->UserModel->Validation->applyRule('TermsOfService', 'Required', t('You must agree to the terms of service.'));
+            #$this->UserModel->Validation->applyRule('TermsOfService', 'Required', t('You must agree to the terms of service.'));
             $this->UserModel->Validation->applyRule('Password', 'Required');
             $this->UserModel->Validation->applyRule('Password', 'Strength');
             $this->UserModel->Validation->applyRule('Password', 'Match');
