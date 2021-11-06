@@ -45,7 +45,7 @@
                 ?>
             </li>
             <?php $this->fireEvent('ExtendedRegistrationFields'); ?>
-            <li>
+            <li style="display: none !important;">
                 <?php
                 echo $this->Form->label('Why do you want to join?', 'DiscoveryText');
                 echo $this->Form->textBox('DiscoveryText', ['MultiLine' => true, 'Wrap' => TRUE]);
@@ -56,7 +56,7 @@
 
             <?php $this->fireEvent('RegisterFormBeforeTerms'); ?>
 
-            <li>
+            <li style="display: none !important;>
                 <?php
                 echo $this->Form->checkBox('TermsOfService', $TermsOfServiceText, ['value' => '1']);
                 ?>

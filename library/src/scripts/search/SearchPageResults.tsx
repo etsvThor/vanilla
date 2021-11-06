@@ -1,5 +1,5 @@
 /**
- * @copyright 2009-2019 Vanilla Forums Inc.
+ * @copyright 2009-2021 Vanilla Forums Inc.
  * @license Proprietary
  */
 
@@ -17,14 +17,13 @@ import { useLastValue } from "@vanilla/react-utils";
 import { hashString } from "@vanilla/utils";
 import React, { useLayoutEffect } from "react";
 import { CoreErrorMessages } from "@library/errorPages/CoreErrorMessages";
-import { IUser } from "@library/@types/api/users";
 import { ALL_CONTENT_DOMAIN_NAME } from "@library/search/searchConstants";
 import { makeSearchUrl } from "@library/search/SearchPageRoute";
 import { formatUrl, t } from "@library/utility/appUtils";
 import qs from "qs";
 import { sprintf } from "sprintf-js";
-import SmartLink from "@library/routing/links/SmartLink";
-import { metasClasses } from "@library/metas/Metas.styles";
+import PanelWidgetHorizontalPadding from "@library/layout/components/PanelWidgetHorizontalPadding";
+import { MetaLink } from "@library/metas/Metas";
 
 interface IProps {}
 
@@ -40,12 +39,16 @@ export function SearchPageResults(props: IProps) {
         }
     }, [status, lastStatus]);
 
+    let content = <></>;
     switch (results.status) {
         case LoadStatus.PENDING:
         case LoadStatus.LOADING:
-            return <SearchPageResultsLoader count={3} />;
+            content = <SearchPageResultsLoader count={3} />;
+            break;
         case LoadStatus.ERROR:
-            return <CoreErrorMessages error={results.error} />;
+            content = <CoreErrorMessages error={results.error} />;
+            break;
+
         case LoadStatus.SUCCESS:
             const { next, prev } = results.data!.pagination;
             let paginationNextClick: React.MouseEventHandler | undefined;
@@ -61,11 +64,11 @@ export function SearchPageResults(props: IProps) {
                     updateForm({ page: prev });
                 };
             }
-            return (
+            content = (
                 <>
                     <AnalyticsData uniqueKey={hashString(form.query + JSON.stringify(results.data!.pagination))} />
                     <ResultList
-                        result={currentDomain.ResultComponent}
+                        resultComponent={currentDomain.ResultComponent}
                         results={results.data!.results.map(mapResult)}
                         ResultWrapper={currentDomain.ResultWrapper}
                         rel={"noindex nofollow"}
@@ -73,7 +76,9 @@ export function SearchPageResults(props: IProps) {
                     <SearchPagination onNextClick={paginationNextClick} onPreviousClick={paginationPreviousClick} />
                 </>
             );
+            break;
     }
+    return <PanelWidgetHorizontalPadding>{content}</PanelWidgetHorizontalPadding>;
 }
 
 /**
@@ -131,11 +136,10 @@ function MetaFactory(props: { searchResult: ISearchResult }) {
         const url = `${root}${searchPath}?${queryString}`;
         const text = sprintf(t("%s results"), searchResult.subqueryMatchCount);
 
-        const classesMeta = metasClasses();
         extraResults = (
-            <SmartLink to={url} className={classesMeta.metaLink} style={{ fontWeight: "bold" }}>
+            <MetaLink to={url} style={{ fontWeight: "bold" }}>
                 {text}
-            </SmartLink>
+            </MetaLink>
         );
     }
 

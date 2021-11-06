@@ -38,6 +38,7 @@ export interface IHomeWidgetContainerOptions {
     headerAlignment?: "left" | "center";
     contentAlignment?: "flex-start" | "center";
     isGrid?: boolean;
+    isCarousel?: boolean;
 }
 
 interface IViewAll {
@@ -71,7 +72,7 @@ export const homeWidgetContainerVariables = useThemeCache(
                 outerBackground: Variables.background({}),
                 innerBackground: Variables.background({}),
                 borderType: BorderType.NONE as BorderType | "navLinks",
-                maxWidth: "100%",
+                maxWidth: undefined as "string" | "number" | undefined,
                 viewAll: {
                     onClick: undefined,
                     to: undefined as string | undefined,
@@ -95,6 +96,7 @@ export const homeWidgetContainerVariables = useThemeCache(
                 headerAlignment: pageHeadingVars.options.alignment as "left" | "center",
                 contentAlignment: "flex-start" as "flex-start" | "center",
                 isGrid: false,
+                isCarousel: false,
             },
             optionOverrides,
         );
@@ -107,6 +109,7 @@ export const homeWidgetContainerVariables = useThemeCache(
                     options.innerBackground.color || options.innerBackground.image
                         ? BorderType.SHADOW
                         : BorderType.NONE,
+                isGrid: options.isCarousel ? false : options.isGrid,
             },
             optionOverrides,
         );
@@ -213,6 +216,8 @@ export const homeWidgetContainerClasses = useThemeCache((optionOverrides?: IHome
     const container = style(
         "container",
         {
+            // Backwards compatibility.
+            clear: "both",
             maxWidth: styleUnit(vars.options.maxWidth),
             margin: "0 auto",
             width: "100%",

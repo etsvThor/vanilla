@@ -17,7 +17,7 @@ import { SCROLL_OFFSET_DEFAULTS, ScrollOffsetContext } from "@library/layout/Scr
 import { registerReducer } from "@library/redux/reducerRegistry";
 import { roleReducer } from "@dashboard/roles/roleReducer";
 import { themeSettingsReducer } from "@library/theming/themeSettingsReducer";
-import { bodyCSS } from "@library/layout/bodyStyles";
+import { globalCSS, useBodyClass } from "@library/layout/bodyStyles";
 import { applyCompatibilityIcons } from "@dashboard/compatibilityStyles/compatibilityIcons";
 import { forumReducer } from "@vanilla/addon-vanilla/redux/reducer";
 import { Route } from "react-router-dom";
@@ -27,10 +27,14 @@ import { mountDashboardTabs } from "@dashboard/forms/mountDashboardTabs";
 import { mountDashboardCodeEditors } from "@dashboard/forms/DashboardCodeEditor";
 import { TextEditorContextProvider } from "@library/textEditor/TextEditor";
 import { VanillaLabsPage } from "@dashboard/pages/VanillaLabsPage";
+import { LayoutPage } from "@dashboard/layout/pages/LayoutPage";
 import { bindToggleChildrenEventListeners } from "@dashboard/settings";
+import { LanguageSettingsPage } from "@dashboard/pages/LanguageSettingsPage";
 
 addComponent("imageUploadGroup", DashboardImageUploadGroup, { overwrite: true });
 addComponent("VanillaLabsPage", VanillaLabsPage);
+addComponent("LayoutPage", LayoutPage);
+addComponent("LanguageSettingsPage", LanguageSettingsPage);
 
 disableComponentTheming();
 onContent(() => initAllUserContent());
@@ -42,8 +46,9 @@ registerReducer("roleRequests", RoleRequestReducer);
 applySharedPortalContext((props) => {
     const [navHeight, setNavHeight] = useState(0);
 
+    useBodyClass();
     useLayoutEffect(() => {
-        bodyCSS();
+        globalCSS();
         const navbar = document.querySelector(".js-navbar");
         if (navbar) {
             setNavHeight(navbar.getBoundingClientRect().height);

@@ -19,6 +19,7 @@ import { notEmpty } from "@vanilla/utils";
 import { TabbedSchemaForm } from "./TabbedSchemaForm";
 import { FormControlWrapper } from "./FormControlWrapper";
 import { FormWrapper } from "./FormWrapper";
+import { validateConditions } from "./utils";
 
 const RenderChildren = (props: React.PropsWithChildren<ISectionProps | IFormProps | IControlGroupProps>) => (
     <>{props.children}</>
@@ -37,6 +38,7 @@ export function PartialSchemaForm(props: IPartialProps) {
         instance,
         rootInstance,
         onChange,
+        validation,
         FormControl,
         // Those default to a react component that simply renders children.
         Form = RenderChildren,
@@ -75,6 +77,7 @@ export function PartialSchemaForm(props: IPartialProps) {
                 rootInstance={rootInstance}
                 schema={schema}
                 rootSchema={rootSchema}
+                validation={validation}
             >
                 {Object.entries(schema.properties).map(([key, value]: [string, JsonSchema]) => {
                     return (
@@ -83,10 +86,12 @@ export function PartialSchemaForm(props: IPartialProps) {
                             path={[...path, key]}
                             schema={value}
                             rootSchema={rootSchema}
-                            instance={instance[key]}
+                            instance={instance?.[key]}
                             rootInstance={rootInstance}
+                            Form={Form}
                             FormSection={FormSection}
                             FormControl={FormControl}
+                            FormControlGroup={FormControlGroup}
                             onChange={(value) => {
                                 onChange({ ...instance, [key]: value });
                             }}
@@ -106,6 +111,7 @@ export function PartialSchemaForm(props: IPartialProps) {
                     rootInstance={rootInstance}
                     schema={schema}
                     rootSchema={rootSchema}
+                    validation={validation}
                 >
                     {section}
                 </FormWrapper>
@@ -120,6 +126,16 @@ export function PartialSchemaForm(props: IPartialProps) {
         return null;
     }
 
+    // Check conditions for controls
+    const visibleControls = validControls.filter(({ conditions }) => {
+        const conditionsValidation = validateConditions(conditions ?? [], rootInstance);
+        const disabled = conditionsValidation.conditions.some((c) => c.disable);
+        return disabled || conditionsValidation.isValid;
+    });
+    if (!visibleControls.length) {
+        return null;
+    }
+
     // Render a control group and the controls within.
     return (
         <FormControlGroup
@@ -129,10 +145,11 @@ export function PartialSchemaForm(props: IPartialProps) {
             rootInstance={rootInstance}
             schema={schema}
             rootSchema={rootSchema}
+            validation={validation}
         >
-            {validControls.map((singleControl) => (
+            {visibleControls.map((singleControl, index) => (
                 <FormControlWrapper
-                    key={path.join("/")}
+                    key={`${path.join("/")}[${index}]`}
                     path={path}
                     control={singleControl}
                     instance={instance}
@@ -141,6 +158,7 @@ export function PartialSchemaForm(props: IPartialProps) {
                     rootSchema={rootSchema}
                     onChange={onChange}
                     required={props.isRequired}
+                    validation={validation}
                     FormControl={FormControl}
                 />
             ))}

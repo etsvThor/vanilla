@@ -43,6 +43,9 @@ class CategoryModel extends Gdn_Model implements EventFromRowInterface, Crawlabl
 
     use LegacyDirtyRecordTrait;
 
+    public const PERM_DISCUSSION_VIEW = "Vanilla.Discussions.View";
+    public const PERM_JUNCTION_TABLE = "Category";
+
     private const ADJUST_COUNT_DECREMENT = "decrement";
 
     private const ADJUST_COUNT_INCREMENT = "increment";
@@ -96,6 +99,11 @@ class CategoryModel extends Gdn_Model implements EventFromRowInterface, Crawlabl
 
     /** @var EventManager */
     private $eventManager;
+
+    /** @var integer[] */
+    static private $deferredCache = [];
+    /** @var boolean */
+    static private $deferredCacheScheduled = false;
 
     /**
      * @deprecated 2.6
@@ -307,7 +315,7 @@ class CategoryModel extends Gdn_Model implements EventFromRowInterface, Crawlabl
             $haveRebuildLock = self::rebuildLock();
             if ($haveRebuildLock || !self::$Categories) {
                 self::$Categories = static::instance()->loadAllCategoriesDb();
-
+                self::$deferredCache = [];
                 self::buildCache();
 
                 // Release lock
@@ -942,16 +950,18 @@ class CategoryModel extends Gdn_Model implements EventFromRowInterface, Crawlabl
             $parentID = $cat['ParentCategoryID'];
 
             if (isset($data[$parentID]) && $parentID != $key) {
-                if (isset($cat['CountAllDiscussions'])) {
-                    $data[$parentID]['CountAllDiscussions'] += $cat['CountAllDiscussions'];
-                }
-                if (isset($cat['CountAllComments'])) {
-                    $data[$parentID]['CountAllComments'] += $cat['CountAllComments'];
-                }
                 if (empty($data[$parentID]['ChildIDs'])) {
                     $data[$parentID]['ChildIDs'] = [];
                 }
-                array_unshift($data[$parentID]['ChildIDs'], $key);
+                if (!in_array($key, $data[$parentID]['ChildIDs'])) {
+                    if (isset($cat['CountAllDiscussions'])) {
+                        $data[$parentID]['CountAllDiscussions'] += $cat['CountAllDiscussions'];
+                    }
+                    if (isset($cat['CountAllComments'])) {
+                        $data[$parentID]['CountAllComments'] += $cat['CountAllComments'];
+                    }
+                    array_unshift($data[$parentID]['ChildIDs'], $key);
+                }
             }
         }
     }
@@ -963,6 +973,7 @@ class CategoryModel extends Gdn_Model implements EventFromRowInterface, Crawlabl
      */
     public static function clearCache(bool $schedule = false) {
         $doClear = function () {
+            self::$Categories = null;
             $instance = self::instance();
             $instance->modelCache->invalidateAll();
             Gdn::cache()->remove(self::CACHE_KEY);
@@ -971,12 +982,7 @@ class CategoryModel extends Gdn_Model implements EventFromRowInterface, Crawlabl
 
         if ($schedule) {
             if (self::$isClearScheduled !== true) {
-                /** @var SchedulerInterface $scheduler */
-                $scheduler = Gdn::getContainer()->get(SchedulerInterface::class);
-                $scheduler->addJob(
-                    CallbackJob::class,
-                    ["callback" => $doClear]
-                );
+                Gdn::getScheduler()->addJobDescriptor(new NormalJobDescriptor(CallbackJob::class, ["callback" => $doClear]));
                 self::$isClearScheduled = true;
             }
         } else {
@@ -1824,7 +1830,7 @@ class CategoryModel extends Gdn_Model implements EventFromRowInterface, Crawlabl
         foreach ($categories as $row) {
             $currentCategoryID = $row['CategoryID'] ?? false;
             self::instance()->setField($currentCategoryID, $db);
-            CategoryModel::setCache($currentCategoryID, $cache);
+            CategoryModel::setDeferredCache($currentCategoryID, $cache);
         }
     }
 
@@ -1899,15 +1905,25 @@ class CategoryModel extends Gdn_Model implements EventFromRowInterface, Crawlabl
         $discussionIDs = array_unique(array_column($ids, 'DiscussionID'));
         $commentIDs = array_filter(array_unique(array_column($ids, 'CommentID')));
 
+        $categoryIDs =  $this->getVisibleCategoryIDs();
+        $discussionsWhere = is_array($categoryIDs) ?
+            [
+                'DiscussionID' => $discussionIDs,
+                'CategoryID' => $categoryIDs
+            ] :
+            [
+                'DiscussionID' => $discussionIDs
+            ];
         if (!empty($discussionIDs)) {
-            $discussions = $this->SQL->getWhere('Discussion', ['DiscussionID' => $discussionIDs])->resultArray();
+            $discussions = $this->SQL->getWhere('Discussion', $discussionsWhere)->resultArray();
             $discussions = array_column($discussions, null, 'DiscussionID');
         } else {
             $discussions = [];
         }
 
         if (!empty($commentIDs)) {
-            $comments = $this->SQL->getWhere('Comment', ['CommentID' => $commentIDs])->resultArray();
+            $commentModel = Gdn::getContainer()->get(CommentModel::class);
+            $comments = $commentModel->lookup(['CommentID' => $commentIDs], true)->resultArray();
             $comments = array_column($comments, null, 'CommentID');
         } else {
             $comments = [];
@@ -3021,12 +3037,11 @@ class CategoryModel extends Gdn_Model implements EventFromRowInterface, Crawlabl
                 );
             }
         }
-        self::setCache();
-        $this->collection->flushCache();
+        self::clearCache();
 
-        // Make sure the shared instance is reset.
+        // Make sure local instance is reset.
         if ($this !== self::instance()) {
-            self::instance()->collection->flushCache();
+            $this->collection->flushCache();
         }
     }
 
@@ -3197,7 +3212,7 @@ class CategoryModel extends Gdn_Model implements EventFromRowInterface, Crawlabl
                     ['CategoryID' => $categoryID]
                 )->put();
 
-                self::setCache($categoryID, $set);
+                self::setDeferredCache($categoryID, $set);
                 $saves[] = array_merge(['CategoryID' => $categoryID], $set);
             }
         }
@@ -3230,28 +3245,26 @@ class CategoryModel extends Gdn_Model implements EventFromRowInterface, Crawlabl
     /**
      * Create a new category collection tied to this model.
      *
-     * @param Gdn_SQLDriver|null $sql
-     * @param Gdn_Cache|null $cache
      * @return CategoryCollection Returns a new collection.
      */
-    public function createCollection(Gdn_SQLDriver $sql = null, Gdn_Cache $cache = null) {
-        if ($sql === null) {
-            $sql = $this->SQL;
-        }
-        if ($cache === null) {
-            $cache = Gdn::cache();
-        }
-        $collection = new CategoryCollection($sql, $cache);
-        // Inject the calculator dependency.
-        $collection->setConfig(Gdn::config());
-        $collection->setStaticCalculator(function (&$category) {
-            self::calculate($category);
-        });
+    public function createCollection(): CategoryCollection {
+        try {
+            $collection = gdn::getContainer()->get(CategoryCollection::class);
 
-        $collection->setUserCalculator(function (&$category) {
-            $this->calculateUser($category);
-        });
-        return $collection;
+            // Inject the calculator dependency.
+            $collection->setConfig(Gdn::config());
+            $collection->setStaticCalculator(function (&$category) {
+                self::calculate($category);
+            });
+
+            $collection->setUserCalculator(function (&$category) {
+                $this->calculateUser($category);
+            });
+
+            return $collection;
+        } catch (Throwable $t) {
+            throw new RuntimeException("Couldn't instantiate CategoryCollection");
+        }
     }
 
     /**
@@ -3469,7 +3482,7 @@ class CategoryModel extends Gdn_Model implements EventFromRowInterface, Crawlabl
                 if (isset($Fields['ParentCategoryID']) && $OldCategory['ParentCategoryID'] != $Fields['ParentCategoryID']) {
                     $this->rebuildTree();
                 } else {
-                    self::setCache($CategoryID, $Fields);
+                    self::setDeferredCache($CategoryID, $Fields);
                 }
             } else {
                 $CategoryID = $this->insert($Fields);
@@ -3607,10 +3620,11 @@ class CategoryModel extends Gdn_Model implements EventFromRowInterface, Crawlabl
      *
      * @since 2.0.18
      * @access public
+     *
      * @param int|bool $iD
      * @param array|bool $data
      */
-    public static function setCache($iD = false, $data = false) {
+    private static function setCache($iD = false, $data = false) {
         self::instance()->collection->refreshCache((int)$iD);
 
         $categories = Gdn::cache()->get(self::CACHE_KEY);
@@ -3669,7 +3683,7 @@ class CategoryModel extends Gdn_Model implements EventFromRowInterface, Crawlabl
         $this->SQL->put($this->Name, $property, ['CategoryID' => $rowID]);
 
         // Set the cache.
-        self::setCache($rowID, $property);
+        self::setDeferredCache($rowID, $property);
         $this->addDirtyRecord('category', $rowID);
 
         return $property;
@@ -3768,7 +3782,7 @@ class CategoryModel extends Gdn_Model implements EventFromRowInterface, Crawlabl
         $db = static::postDBFields($discussion, $comment);
         $cache = static::postCacheFields($discussion, $comment);
         $this->setField($categoryID, $db);
-        static::setCache($categoryID, $cache);
+        static::setDeferredCache($categoryID, $cache);
 
         if ($updateAncestors) {
             // Grab this category's ancestors, pop this category off the end and reverse order for traversal.
@@ -3793,7 +3807,7 @@ class CategoryModel extends Gdn_Model implements EventFromRowInterface, Crawlabl
                 }
                 $currentCategoryID = val('CategoryID', $row);
                 self::instance()->setField($currentCategoryID, $db);
-                CategoryModel::setCache($currentCategoryID, $cache);
+                CategoryModel::setDeferredCache($currentCategoryID, $cache);
 
                 if ($lastCategoryID) {
                     self::instance()->setField($currentCategoryID, 'LastCategoryID', $lastCategoryID);
@@ -3817,7 +3831,7 @@ class CategoryModel extends Gdn_Model implements EventFromRowInterface, Crawlabl
             $fields['LastDiscussionID'] = $row['DiscussionID'];
         }
         $this->setField($categoryID, $fields);
-        self::setCache($categoryID, ['LastTitle' => null, 'LastUserID' => null, 'LastDateInserted' => null, 'LastUrl' => null]);
+        self::setDeferredCache($categoryID, ['LastTitle' => null, 'LastUserID' => null, 'LastDateInserted' => null, 'LastUrl' => null]);
     }
 
     /**
@@ -4188,7 +4202,7 @@ SQL;
                 $currentID = val('CategoryID', $current);
                 $countAllDiscussions = val('CountAllDiscussions', $current);
                 $countAllComments = val('CountAllComments', $current);
-                self::setCache(
+                self::setDeferredCache(
                     $currentID,
                     ['CountAllDiscussions' => $countAllDiscussions, 'CountAllComments' => $countAllComments]
                 );
@@ -4755,5 +4769,36 @@ SQL;
         // Remove permissions related to category
         $permissionModel = Gdn::permissionModel();
         $permissionModel->delete(null, 'Category', 'CategoryID', $categoryID);
+    }
+
+    /**
+     * SetDeferredCache
+     *
+     * @param int $id
+     * @param array $properties
+     */
+    private static function setDeferredCache(int $id, array $properties): void {
+        self::$deferredCache[$id] = isset(self::$deferredCache[$id]) ? array_merge(self::$deferredCache[$id], $properties) : $properties;
+
+        if (self::$deferredCacheScheduled !== true) {
+            // Remember this will run immediately when testing
+            self::$deferredCacheScheduled = true;
+            Gdn::getScheduler()->addJobDescriptor(new NormalJobDescriptor(
+                CallbackJob::class,
+                ['callback' => function () {
+                    if (count(self::$deferredCache) > 0) {
+                        foreach (self::$deferredCache as $id => $properties) {
+                            try {
+                                self::setCache($id, $properties);
+                            } catch (Throwable $t) {
+                                // silent
+                            }
+                        }
+                    }
+                    self::$deferredCache = [];
+                    self::$deferredCacheScheduled = false;
+                }]
+            ));
+        }
     }
 }

@@ -53,6 +53,7 @@ export interface IHomeWidgetItemOptions {
     defaultImageUrl: string | undefined;
     imagePlacement: "top" | "left";
     imagePlacementMobile: "top" | "left";
+    callToActionText: string;
     /** @deprecated */
     iconProps?: any;
 }
@@ -175,6 +176,12 @@ export const homeWidgetItemVariables = useThemeCache(
                  * @enum top | left
                  */
                 imagePlacementMobile: "top",
+                /**
+                 * @var homeWidgetItem.options.callToActionText
+                 * @type string
+                 * @description CTA text by default, used for chat bubble variant
+                 */
+                callToActionText: "Read More",
 
                 /// Legacy Kludge. Because it's options, it can't be mapped.
                 iconProps: {
@@ -221,9 +228,9 @@ export const homeWidgetItemVariables = useThemeCache(
                 ...options,
                 box: {
                     ...options.box,
-                    spacing: {
+                    spacing: Variables.spacing({
                         all: boxHasBorder || hasChatBubble ? (hasChatBubble ? 24 : 16) : undefined,
-                    },
+                    }),
                 },
             },
             optionOverrides,
@@ -236,7 +243,7 @@ export const homeWidgetItemVariables = useThemeCache(
              * @type number
              * @description Apply a minimum width to HomeWidgetItems.
              */
-            minWidth: layoutVars.contentSizes.full / 4 - layoutVars.gutter.size * 5, // Min width allows 4 items to fit.
+            minWidth: 180,
         });
 
         const iconInit = makeVars("icon", {
@@ -668,6 +675,7 @@ export const homeWidgetItemClasses = useThemeCache((optionOverrides?: DeepPartia
         [activeSelector(`.${root}`, "&")]: {
             ...Mixins.background(vars.icon.backgroundState),
         },
+        overflow: "hidden",
     });
 
     const icon = style(
@@ -707,11 +715,17 @@ export const homeWidgetItemClasses = useThemeCache((optionOverrides?: DeepPartia
         },
     );
 
+    const longMetaItem = css({
+        maxHeight: "none",
+    });
+
     const metaDescription = css({
         whiteSpace: "normal",
     });
 
     const callToAction = style("callToAction", {
+        display: "flex",
+        alignItems: "center",
         ...Mixins.padding({
             ...vars.callToAction.padding,
         }),
@@ -734,6 +748,7 @@ export const homeWidgetItemClasses = useThemeCache((optionOverrides?: DeepPartia
         callToAction,
         absoluteName,
         metas,
+        longMetaItem,
         metaDescription,
         content,
         backgroundScrim,

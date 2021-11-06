@@ -9,7 +9,7 @@ import { frameClasses } from "@library/layout/frame/frameStyles";
 import classNames from "classnames";
 import { TouchScrollable } from "react-scrolllock";
 import { inheritHeightClass } from "@library/styles/styleHelpers";
-import { cx } from "@library/styles/styleShim";
+import { cx } from "@emotion/css";
 
 interface IProps {
     className?: string;
@@ -39,7 +39,7 @@ export default function Frame(props: IProps) {
     }
 
     return (
-        <section className={cx("frame", classes.root, props.className, props.canGrow && inheritHeightClass())}>
+        <section className={cx("frame", classes.root, props.canGrow && inheritHeightClass(), props.className)}>
             {props.header && <div className={classes.headerWrap}> {props.header}</div>}
             {content}
             <div className={classes.footerWrap}>{props.footer}</div>

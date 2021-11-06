@@ -4,6 +4,7 @@
  */
 
 import { cx } from "@emotion/css";
+import { Carousel } from "@library/carousel/Carousel";
 import Button from "@library/forms/Button";
 import {
     homeWidgetContainerClasses,
@@ -34,14 +35,19 @@ export function HomeWidgetContainer(props: IHomeWidgetContainerProps) {
     const vars = homeWidgetContainerVariables(props.options);
     const { options } = vars;
     const classes = homeWidgetContainerClasses(props.options);
-    const isGrid = options.isGrid;
+    const { isGrid, isCarousel } = options;
     const widgetClasses = useWidgetLayoutClasses();
 
-    const content = isGrid ? (
-        <HomeWidgetGridContainer {...props}>{props.children}</HomeWidgetGridContainer>
-    ) : (
-        props.children
-    );
+    let content = props.children;
+    if (isGrid) {
+        content = <HomeWidgetGridContainer {...props}>{props.children}</HomeWidgetGridContainer>;
+    } else if (isCarousel) {
+        content = (
+            <Carousel maxSlidesToShow={options.maxColumnCount} carouselTitle={props.title}>
+                {props.children}
+            </Carousel>
+        );
+    }
 
     let viewAllLinkOrButton: ReactNode;
 
@@ -80,12 +86,17 @@ export function HomeWidgetContainer(props: IHomeWidgetContainerProps) {
                 </Container>
             )}
             <div className={cx(!isNavLinks && widgetClass, classes.root)}>
-                <Container fullGutter narrow={options.maxColumnCount <= 2 || isNavLinks}>
+                <Container
+                    // Our own container will be setting the maximum width.
+                    maxWidth={options.maxWidth ? "100%" : undefined}
+                    fullGutter
+                    narrow={options.maxColumnCount <= 2 || isNavLinks}
+                >
                     <div className={classes.container}>
                         <PageHeadingBox
                             title={props.title}
                             actions={options.viewAll.position === "top" && viewAllLinkOrButton}
-                            description={props.subtitle ?? options.description}
+                            description={props.description ?? options.description}
                             subtitle={props.subtitle ?? options?.subtitle?.content}
                             options={{
                                 subtitleType: options.subtitle.type,

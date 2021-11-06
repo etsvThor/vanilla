@@ -19,6 +19,8 @@ import { navigationVariables } from "@library/headers/navigationVariables";
 import { homeWidgetItemVariables } from "@library/homeWidget/HomeWidgetItem.styles";
 import { homeWidgetContainerVariables } from "@library/homeWidget/HomeWidgetContainer.styles";
 import { quickLinksVariables } from "@library/navigation/QuickLinks.variables";
+import { discussionListVariables } from "@library/features/discussions/DiscussionList.variables";
+import { listItemVariables } from "@library/lists/ListItem.variables";
 
 ///
 /// Types
@@ -118,8 +120,7 @@ export function ThemeBuilderContextProvider(props: IProps) {
         let cloned = cloneDeep(rawValueRef.current);
         rawValueRef.current = cloned;
 
-        if ((value === "" || value === undefined) && !allowEmpty) {
-            // Null does not clear this. Null is a valid value.
+        if ((value === "" || value == null) && !allowEmpty) {
             unset(cloned, variableKey);
         } else {
             cloned = set(cloned, variableKey, value);
@@ -206,6 +207,8 @@ function variableGenerator(variables: IThemeVariables) {
         homeWidgetItem: homeWidgetItemVariables({}, variables),
         homeWidgetContainer: homeWidgetContainerVariables({}, variables),
         quickLinks: quickLinksVariables(variables),
+        discussionList: discussionListVariables(variables),
+        listItem: listItemVariables(undefined, variables),
     };
 
     // Mix in the addons generator variables.

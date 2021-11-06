@@ -27,7 +27,7 @@ abstract class AbstractHomeWidgetModule extends AbstractReactModule {
     const CONTENT_TYPE_TEXT = "title-description";
     const ALIGNMENT_LEFT = "left";
     const ALIGNMENT_CENTER = "center";
-    const DEFAULT_MAX_ITEMS_COUNT = 3;
+    const DEFAULT_MAX_ITEMS_COUNT = 5;
 
     /** @var string|null */
     public $title = null;
@@ -90,9 +90,17 @@ abstract class AbstractHomeWidgetModule extends AbstractReactModule {
     public $containerOptions = [];
 
     /**
+     * @var array The container options for the widget.
+     */
+    public $itemOptions = [];
+
+    /**
      * @var int|null
      */
     private $maxItemCount = null;
+
+    /** @var bool */
+    private $isCarousel = false;
 
     /**
      * @return array|null
@@ -125,14 +133,14 @@ abstract class AbstractHomeWidgetModule extends AbstractReactModule {
      * @return array
      */
     protected function getItemOptions(): array {
-        $options = [
+        $options = array_merge_recursive([
             'contentType' => $this->contentType,
             'display' => $this->display,
             'box' => [
                 'borderType' => $this->borderType,
             ],
             'name' => $this->name,
-        ];
+        ], $this->itemOptions);
         if (!empty($this->iconProps)) {
             $options['iconProps'] = $this->iconProps;
         }
@@ -151,6 +159,7 @@ abstract class AbstractHomeWidgetModule extends AbstractReactModule {
             'contentAlignment' => $this->contentAlignment,
             'maxWidth' => $this->maxWidth,
             'noGutter' => $this->noGutter,
+            'isCarousel' => $this->isCarousel,
         ], $this->containerOptions);
 
         return $this->containerOptions;
@@ -242,6 +251,7 @@ abstract class AbstractHomeWidgetModule extends AbstractReactModule {
                 'contentAlignment:s?' => [
                     'enum' => ['center', 'flex-start']
                 ],
+                'isCarousel:b?',
             ]),
             'itemOptions' => Schema::parse([
                 'imagePlacement:s?' => [
@@ -254,6 +264,7 @@ abstract class AbstractHomeWidgetModule extends AbstractReactModule {
                     'borderType:s?',
                     'border:o?',
                     'background:?' => $bgSchema,
+                    'spacing:o?'
                 ],
                 'contentType:s?',
                 'fg:s?',
@@ -297,6 +308,13 @@ abstract class AbstractHomeWidgetModule extends AbstractReactModule {
     }
 
     /**
+     * @param bool $isCarousel
+     */
+    public function setIsCarousel(bool $isCarousel) {
+        $this->isCarousel = $isCarousel;
+    }
+
+    /**
      * @param string $content
      */
     public function setSubtitleContent(string $content) {
@@ -306,14 +324,11 @@ abstract class AbstractHomeWidgetModule extends AbstractReactModule {
     /**
      * Get schema for the number of columns.
      *
-     * @param int $defaultMaxColumns
-     *
      * @return Schema
      */
-    public static function widgetColumnSchema(int $defaultMaxColumns = 3): Schema {
+    public static function widgetColumnSchema(): Schema {
         return Schema::parse([
             'maxColumnCount:i?' => [
-                'default' => $defaultMaxColumns,
                 'x-control' => SchemaForm::dropDown(
                     new FormOptions('Max Columns', 'Set the maximum number of columns for the widget.'),
                     new StaticFormChoices(['1' => 1, '2' => 2, '3' => 3, '4' => 4, '5' => 5])
@@ -329,7 +344,6 @@ abstract class AbstractHomeWidgetModule extends AbstractReactModule {
         return Schema::parse([
             'contentType:s?' => [
                 'enum' => [self::CONTENT_TYPE_TEXT, self::CONTENT_TYPE_ICON, self::CONTENT_TYPE_BACKGROUND, self::CONTENT_TYPE_IMAGE],
-                'default' => self::CONTENT_TYPE_ICON,
                 'x-control' => SchemaForm::dropDown(
                     new FormOptions(
                         'Display Type',
@@ -378,7 +392,7 @@ abstract class AbstractHomeWidgetModule extends AbstractReactModule {
      * @param int $defaultMaxItemCount
      * @return Schema
      */
-    public static function widgetMaxCountItemSchema(int $defaultMaxItemCount = 3) {
+    public static function widgetMaxCountItemSchema(int $defaultMaxItemCount = self::DEFAULT_MAX_ITEMS_COUNT) {
         return Schema::parse([
             'maxItemCount:i?' => [
                 'default' => $defaultMaxItemCount,
@@ -394,6 +408,25 @@ abstract class AbstractHomeWidgetModule extends AbstractReactModule {
     }
 
     /**
+     * Get a schema for the carousel.
+     *
+     * @return Schema
+     */
+    public static function getCarouselSchema() {
+        return Schema::parse([
+            'isCarousel:b?' => [
+                'default' => false,
+                'x-control' => SchemaForm::toggle(
+                    new FormOptions(
+                        'As Carousel',
+                        'Display the widget as a carousel.'
+                    )
+                ),
+            ],
+        ]);
+    }
+
+    /**
      * @return Schema
      */
     public static function getWidgetSchema(): Schema {
@@ -402,7 +435,8 @@ abstract class AbstractHomeWidgetModule extends AbstractReactModule {
             self::widgetDescriptionSchema(),
             self::widgetSubtitleSchema(),
             self::widgetColumnSchema(),
-            self::widgetContentTypeSchema()
+            self::widgetContentTypeSchema(),
+            self::getCarouselSchema()
         );
     }
 }
