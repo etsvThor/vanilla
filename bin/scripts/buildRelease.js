@@ -11,7 +11,7 @@ const chalk = require("chalk").default;
 const path = require("path");
 const { promptVersion, vanillaPath, printTitle, promptBranch } = require("./utils");
 
-const VANILLA_REPO = "https://github.com/vanilla/vanilla.git";
+const VANILLA_REPO = "https://github.com/etsvThor/vanilla.git";
 const PHING_PATH = vanillaPath("vendor/bin/phing");
 const BUILD_DIR = vanillaPath("build");
 const TEMP_DIR = vanillaPath("build/temp");
