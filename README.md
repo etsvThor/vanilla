@@ -5,6 +5,12 @@
 [![codecov](https://codecov.io/gh/vanilla/vanilla/branch/master/graph/badge.svg)](https://codecov.io/gh/vanilla/vanilla)
 ![](https://img.shields.io/github/commits-since/vanilla/vanilla/Vanilla_3.3.svg)
 
+# Thor
+
+Deploy:
+- Run `./bin/release_thor.sh` to build the release
+- Push to `deployed` branch to deploy to brokkr.
+
 ## Howdy, Stranger!
 
 Vanilla was born out of the desire to create flexible, customizable, and downright entertaining
