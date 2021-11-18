@@ -42,15 +42,11 @@ async function promptRequiredText(prompt) {
 }
 
 async function promptVersion() {
-    return promptRequiredText("What version name do you want to use?");
+    return "Thor";
 }
 
 async function promptBranch() {
-    return promptRequiredText(
-        `What branch would you like to build from? This command works for all vanilla versions after ${chalk.bold(
-            "2.8+2019.003",
-        )}`,
-    );
+    return "deployed";
 }
 
 module.exports = {
