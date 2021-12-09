@@ -558,6 +558,8 @@ class EntryController extends Gdn_Controller {
                     unset($data['Photo']);
                 }
 
+                $data['Email'] = val('Email', $user); // Thor change: necessary to pass validation and not update email
+
                 // Synchronize the user's data.
                 $userModel->save($data, [
                     UserModel::OPT_NO_CONFIRM_EMAIL => true,
